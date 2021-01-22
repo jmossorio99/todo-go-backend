@@ -1,5 +1,6 @@
 module quickstart
 
+// +heroku goVersion go1.14.5
 go 1.14.5
 
 require (
