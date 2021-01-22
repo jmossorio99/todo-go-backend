@@ -28,8 +28,8 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Endpoint Hit: homePage")
 }
 
-func returnAllTodos(res http.ResponseWriter, req *http.Request) {
-	fmt.Println("returnAllTodos: called")
+func GetTodos(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("GetTodos: called")
 	res.Header().Add("content-type", "application/json")
 	var todos []Todo
 	collection := client.Database("todoVueDB").Collection("todos")
@@ -54,11 +54,24 @@ func returnAllTodos(res http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(res).Encode(todos)
 }
 
-func returnSingleTodo(w http.ResponseWriter, r *http.Request) {
-
+func GetTodo(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("GetTodo: called")
+	res.Header().Add("content-type", "application/json")
+	params := mux.Vars(req)
+	id, _ := primitive.ObjectIDFromHex(params["id"])
+	var todo Todo
+	collection := client.Database("todoVueDB").Collection("todos")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err := collection.FindOne(ctx, Todo{ID: id}).Decode(&todo)
+	if err != nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+	json.NewEncoder(res).Encode(todo)
 }
 
-func createNewTodo(res http.ResponseWriter, req *http.Request) {
+func CreateTodo(res http.ResponseWriter, req *http.Request) {
 	fmt.Println("createNewTodo: called")
 	res.Header().Add("content-type", "application/json")
 	var todo Todo
@@ -69,17 +82,29 @@ func createNewTodo(res http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(res).Encode(result)
 }
 
-func deleteTodo(w http.ResponseWriter, r *http.Request) {
-
+func DeleteTodo(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("DeleteTodo: called")
+	res.Header().Add("content-type", "application/json")
+	params := mux.Vars(req)
+	id, _ := primitive.ObjectIDFromHex(params["id"])
+	collection := client.Database("todoVueDB").Collection("todos")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	result, err := collection.DeleteOne(ctx, Todo{ID: id})
+	if err != nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+	json.NewEncoder(res).Encode(result)
 }
 
 func handleRequests() {
 	myRouter := mux.NewRouter().StrictSlash(true)
 	myRouter.HandleFunc("/", homePage)
-	myRouter.HandleFunc("/todos", returnAllTodos).Methods("GET")
-	myRouter.HandleFunc("/todos/{id}", returnSingleTodo).Methods("GET")
-	myRouter.HandleFunc("/todos", createNewTodo).Methods("POST")
-	myRouter.HandleFunc("/todos/{id}", deleteTodo).Methods("DELETE")
+	myRouter.HandleFunc("/todos", GetTodos).Methods("GET")
+	myRouter.HandleFunc("/todos/{id}", GetTodo).Methods("GET")
+	myRouter.HandleFunc("/todos", CreateTodo).Methods("POST")
+	myRouter.HandleFunc("/todos/{id}", DeleteTodo).Methods("DELETE")
 	log.Fatal(http.ListenAndServe(":10000", myRouter))
 }
 
